@@ -1,4 +1,6 @@
 from django.db import models
+from django.http import JsonResponse
+from django.utils.module_loading import import_string
 from modelcluster.contrib.taggit import ClusterTaggableManager
 from modelcluster.fields import ParentalKey
 from wagtail.admin.panels import FieldPanel, InlinePanel, StreamFieldPanel
@@ -12,38 +14,44 @@ from taggit.models import Tag as TaggitTag, TaggedItemBase
 from blog.blocks import BodyBlock
 
 
+class BasePage(Page):
+    serializer_class = None
+
+    class Meta:
+        abstract = True
+
+    def get_component_data(self):
+        if not self.serializer_class:
+            raise Exception(f'serializer_class is not set {self.__class__.__name__}')
+
+        serializer_class = import_string(self.serializer_class)
+
+        return {
+            'page_type': self.__class__.__name__,
+            'page_context': serializer_class(self).data
+        }
+
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request)
+        context['page_component'] = self.get_component_data()
+        return context
+
+    def serve(self, request, *args, **kwargs):
+        """ overrides BasePage.serve() that returns TemplateResponse """
+        context = self.get_context(request, *args, **kwargs)
+        return JsonResponse(context['page_component'])
+
+
 class BlogPage(Page):
-    description = models.CharField(max_length=255, blank=True)
-    content_panels = Page.content_panels + [
-        FieldPanel("description", classname="full")
-    ]
+    serializer_class = 'blog.serializers.BlogPageSerializer'
+
 
 
 class PostPage(Page):
-    header_image = models.ForeignKey(
-        'wagtailimages.Image',
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name='+',
-    )
-    body = StreamField(BodyBlock(), blank=True)
-    tags = ClusterTaggableManager(through='blog.PostPageTag', blank=True)
-
-    content_panels = Page.content_panels + [
-        ImageChooserPanel('header_image'),
-        InlinePanel('categories', label='category'),
-        FieldPanel('tags'),
-        StreamFieldPanel('body')
-    ]
+    serializer_class = 'blog.serializers.PostPageSerializer'
 
 
-content_panels = Page.content_panels + [
-    ImageChooserPanel("header_image"),
-    InlinePanel('categories', label='category'),
-    FieldPanel('tags'),
-    StreamFieldPanel('body'),
-]
+
 
 
 @register_snippet
