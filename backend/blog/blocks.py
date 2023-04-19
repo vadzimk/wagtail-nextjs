@@ -16,19 +16,26 @@ from wagtail.core.blocks import (BooleanBlock,
                                  TextBlock,
                                  URLBlock
                                  )
+from wagtail.images.api.fields import ImageRenditionField
 from wagtail.images.blocks import ImageChooserBlock
 
 
 class CustomImageChooserBlock(ImageChooserBlock):
     # chooser block is for object selection
-    pass
+    def __init__(self, *args, **kwargs):
+        self.rendition = kwargs.pop('rendition', 'original')
+        super(CustomImageChooserBlock, self).__init__(**kwargs)
+
+    def get_api_representation(self, value, context=None):
+        return ImageRenditionField(self.rendition).to_representation(value)
+
 
 
 class ImageText(StructBlock):
     # StructBlock works like dict
     reverse = BooleanBlock(required=False)
     text = RichTextBlock()
-    image = CustomImageChooserBlock()
+    image = CustomImageChooserBlock(rendition='width-800')
 
 
 class BodyBlock(StreamBlock):
