@@ -77,3 +77,12 @@ class PostPageSerializer(serializers.ModelSerializer):
                   'categories',
                   'body',
                   'header_image']
+
+
+class PageRelativeUrlListSerializer(serializers.Serializer):
+    def to_representation(self, instance):
+        return {
+            'title': instance.title,
+            'relative_url': instance.url,
+        }
+
